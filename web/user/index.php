@@ -94,8 +94,8 @@ $loanStats = $dashboard->getTotalLoans($_SESSION['user_id']);
 
     <main class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500 transition hover:shadow-xl">
-                    <h3 class="text-xl font-semibold text-green-700 mb-4">Statistik Peminjaman</h3>
+                <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-900 transition hover:shadow-xl">
+                    <h3 class="text-xl font-semibold text-green-900 mb-4">Statistik Peminjaman</h3>
                     <div class="space-y-2">
                         <div class="flex justify-between">
                             <span class="text-gray-600">Total Peminjaman</span>
@@ -108,20 +108,20 @@ $loanStats = $dashboard->getTotalLoans($_SESSION['user_id']);
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500 transition hover:shadow-xl">
-                    <h3 class="text-xl font-semibold text-blue-700 mb-4">Aksi Cepat</h3>
+                <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-800 transition hover:shadow-xl">
+                    <h3 class="text-xl font-semibold text-blue-800 mb-4">Aksi Cepat</h3>
                     <div class="flex space-x-4">
-                        <a href="daftar_alat.php" class="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg text-center font-medium transition">
+                        <a href="daftar_alat.php" class="flex-1 bg-green-800 hover:bg-green-900 text-white py-3 rounded-lg text-center font-medium transition">
                             Pinjam Alat
                         </a>
-                        <a href="riwayat_peminjaman.php" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg text-center font-medium transition">
+                        <a href="riwayat_peminjaman.php" class="flex-1 bg-blue-700 hover:bg-blue-800 text-white py-3 rounded-lg text-center font-medium transition">
                             Riwayat Peminjaman
                         </a>
                     </div>
                 </div>
             </div>
 
-            <div class="mt-8 bg-white rounded-xl shadow-lg p-6 border-l-4 border-teal-500">
+            <div class="mt-8 bg-white rounded-xl shadow-lg p-6 border-l-4 border-teal-700">
                 <h2 class="text-2xl font-bold text-teal-700 mb-6">Peminjaman Menunggu</h2>
                 <?php if(empty($pendingLoans)): ?>
                     <div class="text-center py-8 text-gray-500">

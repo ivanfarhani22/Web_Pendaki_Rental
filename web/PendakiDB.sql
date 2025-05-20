@@ -84,3 +84,92 @@ VALUES ('Ivan Ahmad', 'ivan@email.com', '08123456789', 'ivan123', 'hashed_passwo
 
 COMMIT;
 
+-- Create a trigger to set tanggal_kembali based on the end date from detail_peminjaman
+CREATE OR REPLACE TRIGGER trg_set_tanggal_kembali
+AFTER INSERT ON detail_peminjaman
+FOR EACH ROW
+DECLARE
+    v_current_end_date DATE;
+    v_peminjaman_end_date DATE;
+BEGIN
+    -- Get current end date in peminjaman
+    SELECT tanggal_kembali INTO v_peminjaman_end_date
+    FROM peminjaman
+    WHERE peminjaman_id = :new.peminjaman_id;
+    
+    -- If tanggal_kembali is NULL or the new end date is later, update it
+    IF v_peminjaman_end_date IS NULL OR :new.tanggal_selesai > v_peminjaman_end_date THEN
+        UPDATE peminjaman
+        SET tanggal_kembali = :new.tanggal_selesai
+        WHERE peminjaman_id = :new.peminjaman_id;
+    END IF;
+END;
+/
+
+-- Create a trigger to update equipment availability when peminjaman status changes
+CREATE OR REPLACE TRIGGER trg_update_equipment_availability
+AFTER UPDATE OF status_peminjaman ON peminjaman
+FOR EACH ROW
+BEGIN
+    -- When status changes to "Selesai"
+    IF :new.status_peminjaman = 'Selesai' AND :old.status_peminjaman != 'Selesai' THEN
+        -- Update equipment availability for all items in this peminjaman
+        FOR rec IN (
+            SELECT alat_id, jumlah_pinjam
+            FROM detail_peminjaman
+            WHERE peminjaman_id = :new.peminjaman_id
+        )
+        LOOP
+            -- Increase available count
+            UPDATE alat_mendaki
+            SET jumlah_tersedia = jumlah_tersedia + rec.jumlah_pinjam
+            WHERE alat_id = rec.alat_id;
+        END LOOP;
+    -- When status changes to "Sedang Dipinjam" from "Disetujui"
+    ELSIF :new.status_peminjaman = 'Sedang Dipinjam' AND :old.status_peminjaman = 'Disetujui' THEN
+        -- Nothing to do here as the equipment is already marked as unavailable
+        NULL;
+    END IF;
+END;
+/
+
+-- Create a trigger to update equipment availability when a peminjaman is approved
+CREATE OR REPLACE TRIGGER trg_approve_peminjaman
+AFTER UPDATE OF status_peminjaman ON peminjaman
+FOR EACH ROW
+BEGIN
+    -- When status changes to "Disetujui" 
+    IF :new.status_peminjaman = 'Disetujui' AND :old.status_peminjaman = 'Diajukan' THEN
+        -- Update equipment availability for all items in this peminjaman
+        FOR rec IN (
+            SELECT alat_id, jumlah_pinjam
+            FROM detail_peminjaman
+            WHERE peminjaman_id = :new.peminjaman_id
+        )
+        LOOP
+            -- Decrease available count because equipment is now reserved
+            UPDATE alat_mendaki
+            SET jumlah_tersedia = jumlah_tersedia - rec.jumlah_pinjam
+            WHERE alat_id = rec.alat_id;
+        END LOOP;
+    END IF;
+END;
+/
+
+-- Create a procedure that can be called to check for expired rentals
+CREATE OR REPLACE PROCEDURE check_expired_rentals AS
+BEGIN
+    -- Update peminjaman status to "Selesai" when tanggal_kembali is reached
+    UPDATE peminjaman
+    SET status_peminjaman = 'Selesai'
+    WHERE tanggal_kembali <= TRUNC(SYSDATE)
+    AND status_peminjaman = 'Sedang Dipinjam';
+    
+    -- The trg_update_equipment_availability trigger will handle returning equipment to inventory
+    
+    COMMIT;
+END;
+/
+
+-- Grant execute permission to the procedure (adjust as needed for your user)
+GRANT EXECUTE ON check_expired_rentals TO pendaki;

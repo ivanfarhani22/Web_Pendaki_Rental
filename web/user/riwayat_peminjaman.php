@@ -23,7 +23,14 @@ class RiwayatPeminjaman {
                     p.total_biaya,
                     d.tanggal_mulai,
                     d.tanggal_selesai,
-                    a.nama_alat
+                    a.nama_alat,
+                    a.alat_id,
+                    (SELECT status_pembayaran FROM pembayaran WHERE peminjaman_id = p.peminjaman_id AND ROWNUM = 1) as status_pembayaran,
+                    CASE
+                        WHEN p.status_peminjaman = 'Disetujui' AND d.tanggal_selesai < CURRENT_DATE
+                        THEN (CURRENT_DATE - d.tanggal_selesai) * 10000
+                        ELSE 0
+                    END as denda
                   FROM peminjaman p
                   JOIN detail_peminjaman d ON p.peminjaman_id = d.peminjaman_id
                   JOIN alat_mendaki a ON d.alat_id = a.alat_id
@@ -39,7 +46,62 @@ class RiwayatPeminjaman {
             $riwayat[] = $row;
         }
 
+        // Update status peminjaman yang sudah selesai berdasarkan tanggal
+        $this->updateStatusPeminjamanSelesai();
+
         return $riwayat;
+    }
+
+    public function updateStatusPeminjamanSelesai() {
+        // Ambil semua peminjaman yang sudah melewati tanggal_selesai tapi statusnya masih Dikonfirmasi
+        $query = "SELECT 
+                    p.peminjaman_id, 
+                    d.alat_id
+                  FROM peminjaman p
+                  JOIN detail_peminjaman d ON p.peminjaman_id = d.peminjaman_id
+                  WHERE p.status_peminjaman = 'Dikonfirmasi'
+                  AND d.tanggal_selesai < CURRENT_DATE";
+        
+        $stmt = oci_parse($this->conn, $query);
+        oci_execute($stmt);
+        
+        $peminjaman_selesai = [];
+        while ($row = oci_fetch_assoc($stmt)) {
+            $peminjaman_selesai[] = $row;
+        }
+        
+        // Mulai transaksi untuk update status dan stok
+        if (!empty($peminjaman_selesai)) {
+            $this->conn = oci_connect('pendaki', 'password123', '(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=ORCLPDB)))');
+            oci_set_autocommit($this->conn, FALSE);
+            
+            try {
+                foreach ($peminjaman_selesai as $item) {
+                    // Update status peminjaman menjadi Selesai
+                    $query_update_status = "UPDATE peminjaman 
+                                         SET status_peminjaman = 'Selesai' 
+                                         WHERE peminjaman_id = :peminjaman_id";
+                    $stmt_update = oci_parse($this->conn, $query_update_status);
+                    oci_bind_by_name($stmt_update, ':peminjaman_id', $item['PEMINJAMAN_ID']);
+                    oci_execute($stmt_update);
+
+                    // Kembalikan alat ke stok tersedia
+                    $query_update_stok = "UPDATE alat_mendaki 
+                                       SET jumlah_tersedia = jumlah_tersedia + 1 
+                                       WHERE alat_id = :alat_id";
+                    $stmt_stok = oci_parse($this->conn, $query_update_stok);
+                    oci_bind_by_name($stmt_stok, ':alat_id', $item['ALAT_ID']);
+                    oci_execute($stmt_stok);
+                }
+                
+                // Commit transaksi jika semua berhasil
+                oci_commit($this->conn);
+                
+            } catch (Exception $e) {
+                // Rollback jika terjadi error
+                oci_rollback($this->conn);
+            }
+        }
     }
 
     public function batalkanPeminjaman($peminjaman_id, $user_id) {
@@ -88,6 +150,18 @@ class RiwayatPeminjaman {
             return false;
         }
     }
+    
+    public function cekStatusPembayaran($peminjaman_id) {
+        $query = "SELECT status_pembayaran FROM pembayaran 
+                  WHERE peminjaman_id = :peminjaman_id
+                  ORDER BY tanggal_pembayaran DESC";
+        $stmt = oci_parse($this->conn, $query);
+        oci_bind_by_name($stmt, ':peminjaman_id', $peminjaman_id);
+        oci_execute($stmt);
+        
+        $row = oci_fetch_assoc($stmt);
+        return $row ? $row['STATUS_PEMBAYARAN'] : null;
+    }
 }
 
 $database = new Database();
@@ -122,7 +196,7 @@ $riwayat = $riwayatPeminjaman->getRiwayatPeminjaman($_SESSION['user_id']);
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div class="container mx-auto">
             <div class="bg-white shadow-lg rounded-lg overflow-hidden border border-green-100">
-                <div class="bg-gradient-to-r from-green-600 to-green-400 p-6">
+                <div class="bg-gradient-to-r from-green-900 to-green-900 p-6">
                     <h1 class="text-3xl font-bold text-white flex items-center">
                         <i class="fas fa-history mr-4"></i>
                         Riwayat Peminjaman
@@ -131,7 +205,7 @@ $riwayat = $riwayatPeminjaman->getRiwayatPeminjaman($_SESSION['user_id']);
 
                 <div class="p-6">
                     <?php if(isset($pesan)): ?>
-                        <div class="<?= $hasil_pembatalan ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700' ?> border p-4 rounded mb-6">
+                        <div class="<?= (isset($hasil_pembatalan) && $hasil_pembatalan) || (isset($hasil_pembayaran) && $hasil_pembayaran) ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700' ?> border p-4 rounded mb-6">
                             <?= $pesan ?>
                         </div>
                     <?php endif; ?>
@@ -151,6 +225,8 @@ $riwayat = $riwayatPeminjaman->getRiwayatPeminjaman($_SESSION['user_id']);
                                         <th class="py-3 px-4 text-left text-green-700">Periode</th>
                                         <th class="py-3 px-4 text-left text-green-700">Total Biaya</th>
                                         <th class="py-3 px-4 text-left text-green-700">Status</th>
+                                        <th class="py-3 px-4 text-left text-green-700">Pembayaran</th>
+                                        <th class="py-3 px-4 text-left text-green-700">Denda</th>
                                         <th class="py-3 px-4 text-left text-green-700">Aksi</th>
                                     </tr>
                                 </thead>
@@ -175,10 +251,36 @@ $riwayat = $riwayatPeminjaman->getRiwayatPeminjaman($_SESSION['user_id']);
                                             <span class="<?= 
                                                 $item['STATUS_PEMINJAMAN'] == 'Selesai' ? 'bg-green-100 text-green-800' : 
                                                 ($item['STATUS_PEMINJAMAN'] == 'Diajukan' ? 'bg-yellow-100 text-yellow-800' : 
-                                                ($item['STATUS_PEMINJAMAN'] == 'Dikonfirmasi' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'))
+                                                ($item['STATUS_PEMINJAMAN'] == 'Dikonfirmasi' ? 'bg-blue-100 text-blue-800' : 
+                                                ($item['STATUS_PEMINJAMAN'] == 'Disetujui' ? 'bg-teal-100 text-teal-800' : 'bg-red-100 text-red-800')))
                                             ?> px-2 py-1 rounded-full text-xs">
                                                 <?= $item['STATUS_PEMINJAMAN'] ?>
                                             </span>
+                                        </td>
+                                        <td class="py-4 px-4">
+                                            <?php if($item['STATUS_PEMBAYARAN']): ?>
+                                                <span class="<?= 
+                                                    $item['STATUS_PEMBAYARAN'] == 'Lunas' ? 'bg-green-100 text-green-800' : 
+                                                    ($item['STATUS_PEMBAYARAN'] == 'Menunggu' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800')
+                                                ?> px-2 py-1 rounded-full text-xs">
+                                                    <?= $item['STATUS_PEMBAYARAN'] ?>
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs">
+                                                    Belum Bayar
+                                                </span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="py-4 px-4">
+                                            <?php if($item['DENDA'] > 0): ?>
+                                                <span class="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs">
+                                                    Rp <?= number_format($item['DENDA'], 0, ',', '.') ?>
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                                                    Tidak Ada
+                                                </span>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="py-4 px-4">
                                             <?php if($item['STATUS_PEMINJAMAN'] == 'Diajukan'): ?>
@@ -189,6 +291,14 @@ $riwayat = $riwayatPeminjaman->getRiwayatPeminjaman($_SESSION['user_id']);
                                                         Batalkan
                                                     </button>
                                                 </form>
+                                            <?php elseif($item['STATUS_PEMINJAMAN'] == 'Disetujui' && (!$item['STATUS_PEMBAYARAN'] || $item['STATUS_PEMBAYARAN'] != 'Lunas')): ?>
+                                                <a href="proses_pembayaran.php?peminjaman_id=<?= $item['PEMINJAMAN_ID'] ?>" class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition text-sm inline-block">
+                                                    <i class="fas fa-money-bill-wave mr-1"></i> Bayar
+                                                </a>
+                                            <?php elseif($item['STATUS_PEMINJAMAN'] == 'Disetujui' && $item['DENDA'] > 0): ?>
+                                                <a href="bayar_denda.php?peminjaman_id=<?= $item['PEMINJAMAN_ID'] ?>&jumlah_denda=<?= $item['DENDA'] ?>" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition text-sm">
+                                                    <i class="fas fa-exclamation-triangle mr-1"></i> Bayar Denda
+                                                </a>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -208,9 +318,11 @@ $riwayat = $riwayatPeminjaman->getRiwayatPeminjaman($_SESSION['user_id']);
         // Optional: Add some interactivity
         document.querySelectorAll('form').forEach(form => {
             form.addEventListener('submit', function(e) {
-                const confirmed = confirm('Yakin ingin membatalkan peminjaman?');
-                if (!confirmed) {
-                    e.preventDefault();
+                if (form.querySelector('input[name="batalkan_peminjaman"]')) {
+                    const confirmed = confirm('Yakin ingin membatalkan peminjaman?');
+                    if (!confirmed) {
+                        e.preventDefault();
+                    }
                 }
             });
         });
