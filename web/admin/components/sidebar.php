@@ -34,6 +34,11 @@
                     <i class="fas fa-exchange-alt mr-2"></i>Manajemen Peminjaman
                 </a>
             </li>
+             <li>
+                <a href="manajemen_pembayaran.php" class="block py-3 px-4 hover:bg-gray-700 <?= (basename($_SERVER['PHP_SELF']) == 'manajemen_pembayaran.php') ? 'bg-gray-700' : '' ?>">
+                    <i class="fas fa-credit-card mr-2"></i>Manajemen Pembayaran
+                </a>
+            </li>
             <li>
                 <a href="laporan.php" class="block py-3 px-4 hover:bg-gray-700 <?= (basename($_SERVER['PHP_SELF']) == 'laporan.php') ? 'bg-gray-700' : '' ?>">
                     <i class="fas fa-file-alt mr-2"></i>Laporan

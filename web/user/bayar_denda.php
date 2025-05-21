@@ -8,7 +8,7 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// Cek apakah ada parameter peminjaman_id dan jumlah_denda
+// Pastikan parameter peminjaman_id dan jumlah_denda ada
 if (!isset($_GET['peminjaman_id']) || !isset($_GET['jumlah_denda'])) {
     header('Location: riwayat_peminjaman.php');
     exit();
@@ -16,244 +16,239 @@ if (!isset($_GET['peminjaman_id']) || !isset($_GET['jumlah_denda'])) {
 
 $peminjaman_id = $_GET['peminjaman_id'];
 $jumlah_denda = $_GET['jumlah_denda'];
-$user_id = $_SESSION['user_id'];
 
-// Class untuk proses bayar denda
-class DendaHandler {
-    private $conn;
+// Validasi peminjaman milik user yang login
+$database = new Database();
+$conn = $database->getConnection();
 
-    public function __construct($database) {
-        $this->conn = $database->getConnection();
-    }
-
-    public function validateDenda($peminjaman_id, $user_id) {
-        // Cek apakah peminjaman milik user yang sedang login
-        $query = "SELECT 
-                    p.peminjaman_id, 
-                    p.status_peminjaman, 
-                    p.user_id,
-                    d.tanggal_selesai,
-                    a.alat_id,
-                    a.nama_alat,
+$query_validasi = "SELECT p.peminjaman_id, p.user_id, p.status_peminjaman, a.nama_alat,
                     CASE
-                        WHEN p.status_peminjaman = 'Disetujui' AND d.tanggal_selesai < CURRENT_DATE
+                        WHEN p.status_peminjaman = 'Sedang Dipinjam' AND d.tanggal_selesai < CURRENT_DATE
                         THEN (CURRENT_DATE - d.tanggal_selesai) * 10000
                         ELSE 0
                     END as denda
-                  FROM peminjaman p
-                  JOIN detail_peminjaman d ON p.peminjaman_id = d.peminjaman_id
-                  JOIN alat_mendaki a ON d.alat_id = a.alat_id
-                  WHERE p.peminjaman_id = :peminjaman_id";
-        
-        $stmt = oci_parse($this->conn, $query);
-        oci_bind_by_name($stmt, ':peminjaman_id', $peminjaman_id);
-        oci_execute($stmt);
-        
-        $data = oci_fetch_assoc($stmt);
-        
-        if (!$data || $data['USER_ID'] != $user_id) {
-            return ['valid' => false, 'message' => 'Peminjaman tidak ditemukan atau bukan milik Anda.'];
-        }
-        
-        if ($data['STATUS_PEMINJAMAN'] != 'Disetujui') {
-            return ['valid' => false, 'message' => 'Status peminjaman tidak valid untuk pembayaran denda.'];
-        }
-        
-        if ($data['DENDA'] <= 0) {
-            return ['valid' => false, 'message' => 'Tidak ada denda yang perlu dibayar.'];
-        }
-        
-        return ['valid' => true, 'data' => $data];
-    }
-    
-    public function processDendaPayment($peminjaman_id, $user_id, $jumlah_denda) {
-        // Metode pembayaran hanya Cash
-        $metode_pembayaran = 'Cash';
-        
-        // Validasi data
-        $validation = $this->validateDenda($peminjaman_id, $user_id);
-        if (!$validation['valid']) {
-            return ['success' => false, 'message' => $validation['message']];
-        }
-        
-        // Mulai transaksi
-        $this->conn = oci_connect('pendaki', 'password123', '(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=ORCLPDB)))');
-        oci_set_autocommit($this->conn, FALSE);
-        
-        try {
-            // 1. Tambahkan data pembayaran denda ke tabel pembayaran
-            $query_pembayaran = "INSERT INTO pembayaran (
-                                    pembayaran_id, 
-                                    peminjaman_id, 
-                                    tanggal_pembayaran,
-                                    jumlah_pembayaran, 
-                                    metode_pembayaran, 
-                                    status_pembayaran
-                                ) VALUES (
-                                    pembayaran_seq.NEXTVAL, 
-                                    :peminjaman_id, 
-                                    CURRENT_DATE, 
-                                    :jumlah_denda, 
-                                    :metode_pembayaran, 
-                                    'Lunas'
-                                )";
-            
-            $stmt_pembayaran = oci_parse($this->conn, $query_pembayaran);
-            oci_bind_by_name($stmt_pembayaran, ':peminjaman_id', $peminjaman_id);
-            oci_bind_by_name($stmt_pembayaran, ':jumlah_denda', $jumlah_denda);
-            oci_bind_by_name($stmt_pembayaran, ':metode_pembayaran', $metode_pembayaran);
-            oci_execute($stmt_pembayaran);
-            
-            // 2. Update status peminjaman menjadi Selesai
-            $query_update_status = "UPDATE peminjaman 
-                                    SET status_peminjaman = 'Selesai' 
-                                    WHERE peminjaman_id = :peminjaman_id";
-            $stmt_update = oci_parse($this->conn, $query_update_status);
-            oci_bind_by_name($stmt_update, ':peminjaman_id', $peminjaman_id);
-            oci_execute($stmt_update);
-            
-            // 3. Kembalikan alat ke stok tersedia
-            $query_alat = "SELECT alat_id FROM detail_peminjaman 
-                          WHERE peminjaman_id = :peminjaman_id";
-            $stmt_alat = oci_parse($this->conn, $query_alat);
-            oci_bind_by_name($stmt_alat, ':peminjaman_id', $peminjaman_id);
-            oci_execute($stmt_alat);
-            $alat_data = oci_fetch_assoc($stmt_alat);
-            
-            if ($alat_data) {
-                $query_update_stok = "UPDATE alat_mendaki 
-                                      SET jumlah_tersedia = jumlah_tersedia + 1 
-                                      WHERE alat_id = :alat_id";
-                $stmt_stok = oci_parse($this->conn, $query_update_stok);
-                oci_bind_by_name($stmt_stok, ':alat_id', $alat_data['ALAT_ID']);
-                oci_execute($stmt_stok);
-            }
-            
-            // Commit transaksi jika semua operasi berhasil
-            oci_commit($this->conn);
-            return ['success' => true, 'message' => 'Pembayaran denda berhasil dilakukan.'];
-            
-        } catch (Exception $e) {
-            // Rollback jika terjadi error
-            oci_rollback($this->conn);
-            return ['success' => false, 'message' => 'Terjadi kesalahan saat memproses pembayaran: ' . $e->getMessage()];
-        }
-    }
-}
+                   FROM peminjaman p
+                   JOIN detail_peminjaman d ON p.peminjaman_id = d.peminjaman_id
+                   JOIN alat_mendaki a ON d.alat_id = a.alat_id
+                   WHERE p.peminjaman_id = :peminjaman_id AND p.user_id = :user_id";
 
-$database = new Database();
-$dendaHandler = new DendaHandler($database);
+$stmt = oci_parse($conn, $query_validasi);
+oci_bind_by_name($stmt, ':peminjaman_id', $peminjaman_id);
+oci_bind_by_name($stmt, ':user_id', $_SESSION['user_id']);
+oci_execute($stmt);
 
-// Variabel untuk pesan error/success
-$message = '';
-$success = false;
+$data_peminjaman = oci_fetch_assoc($stmt);
 
-// Proses form pembayaran denda
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $result = $dendaHandler->processDendaPayment(
-        $peminjaman_id,
-        $user_id,
-        $jumlah_denda
-    );
-    
-    $success = $result['success'];
-    $message = $result['message'];
-    
-    if ($success) {
-        // Redirect ke halaman riwayat dengan pesan sukses
-        header("Location: riwayat_peminjaman.php?status=success&message=" . urlencode($message));
-        exit();
-    }
-}
-
-// Validasi denda sebelum menampilkan form
-$validation = $dendaHandler->validateDenda($peminjaman_id, $user_id);
-if (!$validation['valid']) {
-    header("Location: riwayat_peminjaman.php?status=error&message=" . urlencode($validation['message']));
+// Jika data tidak ditemukan atau tidak ada denda, redirect
+if (!$data_peminjaman || $data_peminjaman['DENDA'] <= 0) {
+    header('Location: riwayat_peminjaman.php');
     exit();
 }
 
-// Jika valid, tampilkan form pembayaran denda
-$denda_data = $validation['data'];
-?>
+// Proses pembayaran denda
+$success_message = "";
+$error_message = "";
 
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    // Proses pembayaran
+    $metode_pembayaran = $_POST['metode_pembayaran'];
+    
+    try {
+        // Mulai transaksi
+        
+        // Tambahkan record pembayaran denda - fixed column name from jumlah_bayar to jumlah_pembayaran
+        // Proses upload bukti pembayaran jika metode adalah Transfer Bank atau E-Wallet
+        $bukti_pembayaran = null;
+        if (($metode_pembayaran == 'Transfer Bank' || $metode_pembayaran == 'E-Wallet') && isset($_FILES['bukti_pembayaran'])) {
+            $target_dir = "../uploads/bukti_pembayaran/";
+            
+            // Create directory if it doesn't exist
+            if (!file_exists($target_dir)) {
+                mkdir($target_dir, 0777, true);
+            }
+            
+            $file_extension = pathinfo($_FILES["bukti_pembayaran"]["name"], PATHINFO_EXTENSION);
+            $new_filename = "bukti_" . $peminjaman_id . "_" . time() . "." . $file_extension;
+            $target_file = $target_dir . $new_filename;
+            
+            // Check if file is an actual image
+            $check = getimagesize($_FILES["bukti_pembayaran"]["tmp_name"]);
+            if ($check === false) {
+                throw new Exception("File yang diunggah bukan gambar.");
+            }
+            
+            // Check file size (max 2MB)
+            if ($_FILES["bukti_pembayaran"]["size"] > 2000000) {
+                throw new Exception("Ukuran file terlalu besar. Maksimal 2MB.");
+            }
+            
+            // Allow certain file formats
+            if ($file_extension != "jpg" && $file_extension != "png" && $file_extension != "jpeg") {
+                throw new Exception("Hanya file JPG, JPEG & PNG yang diperbolehkan.");
+            }
+            
+            if (!move_uploaded_file($_FILES["bukti_pembayaran"]["tmp_name"], $target_file)) {
+                throw new Exception("Gagal mengunggah file bukti pembayaran.");
+            }
+            
+            $bukti_pembayaran = $new_filename;
+        }
+        
+        // Query SQL sesuai dengan ada/tidaknya bukti pembayaran
+        if ($bukti_pembayaran) {
+            $query_bayar = "INSERT INTO pembayaran (peminjaman_id, jumlah_pembayaran, status_pembayaran, metode_pembayaran, tanggal_pembayaran, bukti_pembayaran)
+                            VALUES (:peminjaman_id, :jumlah_pembayaran, 'Lunas', :metode_pembayaran, CURRENT_DATE, :bukti_pembayaran)";
+        } else {
+            $query_bayar = "INSERT INTO pembayaran (peminjaman_id, jumlah_pembayaran, status_pembayaran, metode_pembayaran, tanggal_pembayaran)
+                            VALUES (:peminjaman_id, :jumlah_pembayaran, 'Lunas', :metode_pembayaran, CURRENT_DATE)";
+        }
+        
+        $stmt_bayar = oci_parse($conn, $query_bayar);
+        oci_bind_by_name($stmt_bayar, ':peminjaman_id', $peminjaman_id);
+        oci_bind_by_name($stmt_bayar, ':jumlah_pembayaran', $jumlah_denda);
+        oci_bind_by_name($stmt_bayar, ':metode_pembayaran', $metode_pembayaran);
+        
+        // Bind bukti pembayaran jika ada
+        if ($bukti_pembayaran) {
+            oci_bind_by_name($stmt_bayar, ':bukti_pembayaran', $bukti_pembayaran);
+        }
+        
+        $result = oci_execute($stmt_bayar, OCI_DEFAULT);
+        
+        if (!$result) {
+            $e = oci_error($stmt_bayar);
+            throw new Exception($e['message']);
+        }
+        
+        // Update status peminjaman menjadi 'Selesai' jika pembayaran denda berhasil
+        // Karena denda sudah dibayar, peminjaman seharusnya dianggap selesai
+        $query_update = "UPDATE peminjaman SET status_peminjaman = 'Selesai' 
+                         WHERE peminjaman_id = :peminjaman_id";
+
+        $stmt_update = oci_parse($conn, $query_update);
+        oci_bind_by_name($stmt_update, ':peminjaman_id', $peminjaman_id);
+        $result_update = oci_execute($stmt_update, OCI_DEFAULT);
+        
+        if (!$result_update) {
+            $e = oci_error($stmt_update);
+            throw new Exception($e['message']);
+        }
+        
+        // Commit transaksi
+        oci_commit($conn);
+        
+        $success_message = "Pembayaran denda berhasil diproses.";
+    } catch (Exception $e) {
+        // Rollback jika terjadi error
+        oci_rollback($conn);
+        $error_message = "Terjadi kesalahan saat memproses pembayaran denda: " . $e->getMessage();
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Pembayaran Denda</title>
+    <title>Bayar Denda</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
 </head>
 <body class="bg-gradient-to-br from-gray-100 to-green-50 min-h-screen">
     <?php include '../includes/header.php'; ?>
-    
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div class="bg-white shadow-lg rounded-lg overflow-hidden border border-green-100">
-            <div class="bg-gradient-to-r from-red-600 to-red-400 p-6">
-                <h1 class="text-2xl font-bold text-white flex items-center">
-                    <i class="fas fa-exclamation-triangle mr-4"></i>
-                    Pembayaran Denda
-                </h1>
-            </div>
-            
-            <div class="p-6">
-                <?php if (!empty($message) && !$success): ?>
-                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                    <?= $message ?>
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div class="container mx-auto">
+            <div class="bg-white shadow-lg rounded-lg overflow-hidden border border-green-100">
+                <div class="bg-gradient-to-r from-green-900 to-green-900 p-6">
+                    <h1 class="text-3xl font-bold text-white flex items-center">
+                        <i class="fas fa-money-bill-wave mr-4"></i>
+                        Pembayaran Denda
+                    </h1>
                 </div>
-                <?php endif; ?>
-                
-                <div class="mb-6 bg-red-50 p-4 rounded-lg border border-red-100">
-                    <h2 class="text-lg font-semibold text-red-700 mb-2">Informasi Denda</h2>
-                    <p class="text-gray-700 mb-2">Anda memiliki denda keterlambatan pengembalian alat pendakian.</p>
-                    <div class="flex items-center justify-between py-2 border-b border-gray-200">
-                        <span class="text-gray-600">ID Peminjaman:</span>
-                        <span class="font-semibold"><?= $peminjaman_id ?></span>
-                    </div>
-                    <div class="flex items-center justify-between py-2 border-b border-gray-200">
-                        <span class="text-gray-600">Alat yang Dipinjam:</span>
-                        <span class="font-semibold"><?= $denda_data['NAMA_ALAT'] ?></span>
-                    </div>
-                    <div class="flex items-center justify-between py-2 border-b border-gray-200">
-                        <span class="text-gray-600">Tanggal Selesai Peminjaman:</span>
-                        <span class="font-semibold"><?= date('d M Y', strtotime($denda_data['TANGGAL_SELESAI'])) ?></span>
-                    </div>
-                    <div class="flex items-center justify-between py-2 border-b border-gray-200">
-                        <span class="text-gray-600">Jumlah Hari Keterlambatan:</span>
-                        <?php $hari_terlambat = floor($denda_data['DENDA'] / 10000); ?>
-                        <span class="font-semibold"><?= $hari_terlambat ?> hari</span>
-                    </div>
-                    <div class="flex items-center justify-between py-2 border-b border-gray-200">
-                        <span class="text-gray-600">Jumlah Denda:</span>
-                        <span class="font-semibold text-red-600">Rp <?= number_format($jumlah_denda, 0, ',', '.') ?></span>
-                    </div>
+
+                <div class="p-6">
+                    <?php if($success_message): ?>
+                        <div class="bg-green-100 border-green-400 text-green-700 border p-4 rounded mb-6">
+                            <?= $success_message ?>
+                            <div class="mt-4">
+                                <a href="riwayat_peminjaman.php" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">
+                                    Kembali ke Riwayat Peminjaman
+                                </a>
+                            </div>
+                        </div>
+                    <?php elseif($error_message): ?>
+                        <div class="bg-red-100 border-red-400 text-red-700 border p-4 rounded mb-6">
+                            <?= $error_message ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="bg-yellow-50 border-yellow-300 text-yellow-800 border p-4 rounded mb-6">
+                            <h2 class="text-xl font-semibold mb-2">Informasi Denda</h2>
+                            <p>Anda memiliki denda yang harus dibayarkan untuk peminjaman alat <strong><?= $data_peminjaman['NAMA_ALAT'] ?></strong> sebesar <strong>Rp <?= number_format($data_peminjaman['DENDA'], 0, ',', '.') ?></strong>.</p>
+                            <p class="mt-2">Harap selesaikan pembayaran denda untuk menghindari penalti tambahan.</p>
+                        </div>
+
+                        <form method="POST" class="bg-white rounded-lg p-6 border border-gray-200" enctype="multipart/form-data">
+                            <div class="mb-6">
+                                <label class="block text-gray-700 text-sm font-bold mb-2" for="metode_pembayaran">
+                                    Metode Pembayaran
+                                </label>
+                                <select name="metode_pembayaran" id="metode_pembayaran" required class="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" onchange="toggleBuktiPembayaran()">
+                                    <option value="">-- Pilih Metode Pembayaran --</option>
+                                    <option value="Transfer Bank">Transfer Bank</option>
+                                    <option value="E-Wallet">E-Wallet (DANA, OVO, GoPay)</option>
+                                    <option value="Tunai">Tunai di Tempat</option>
+                                </select>
+                            </div>
+                            
+                            <div id="bukti_pembayaran_container" class="mb-6" style="display: none;">
+                                <label class="block text-gray-700 text-sm font-bold mb-2" for="bukti_pembayaran">
+                                    Unggah Bukti Pembayaran
+                                </label>
+                                <input type="file" name="bukti_pembayaran" id="bukti_pembayaran" 
+                                       class="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                       accept="image/jpeg,image/png,image/jpg">
+                                <p class="text-gray-500 text-xs mt-1">Format yang didukung: JPG, JPEG, PNG. Ukuran maksimal: 2MB</p>
+                            </div>
+
+                            <div class="mb-6">
+                                <p class="text-gray-700 font-semibold">Total Denda: <span class="text-red-600">Rp <?= number_format($data_peminjaman['DENDA'], 0, ',', '.') ?></span></p>
+                            </div>
+
+                            <div class="flex items-center justify-between">
+                                <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                                    Proses Pembayaran
+                                </button>
+                                <a href="riwayat_peminjaman.php" class="inline-block align-baseline font-bold text-sm text-green-500 hover:text-green-800">
+                                    Kembali
+                                </a>
+                            </div>
+                        </form>
+                    <?php endif; ?>
                 </div>
-                
-                <form method="POST" action="" class="bg-white rounded-lg">
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
-                        <h3 class="text-md font-semibold mb-2">Petunjuk Pembayaran</h3>
-                        <p class="text-gray-600 mb-2">Metode pembayaran: <span class="font-semibold">Tunai (Cash)</span></p>
-                        <p class="text-gray-600">Pembayaran denda dilakukan secara tunai pada saat pengembalian alat pendakian di toko kami.</p>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <p class="text-gray-600 text-sm">Dengan melakukan pembayaran, Anda menyetujui bahwa denda keterlambatan telah dilunasi dan status peminjaman akan diselesaikan.</p>
-                    </div>
-                    
-                    <div class="flex justify-between">
-                        <a href="riwayat_peminjaman.php" class="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600 transition">
-                            <i class="fas fa-arrow-left mr-2"></i> Kembali
-                        </a>
-                        <button type="submit" class="bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600 transition">
-                            <i class="fas fa-money-bill-wave mr-2"></i> Konfirmasi Pembayaran Denda
-                        </button>
-                    </div>
-                </form>
             </div>
         </div>
     </main>
-    
+
     <?php include '../includes/footer.php'; ?>
+    
+    <script>
+        function toggleBuktiPembayaran() {
+            var metode = document.getElementById('metode_pembayaran').value;
+            var buktiContainer = document.getElementById('bukti_pembayaran_container');
+            var buktiInput = document.getElementById('bukti_pembayaran');
+            
+            if (metode === 'Transfer Bank' || metode === 'E-Wallet') {
+                buktiContainer.style.display = 'block';
+                buktiInput.required = true;
+            } else {
+                buktiContainer.style.display = 'none';
+                buktiInput.required = false;
+            }
+        }
+        
+        // Run on page load to handle pre-selected values
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleBuktiPembayaran();
+        });
+    </script>
 </body>
 </html>

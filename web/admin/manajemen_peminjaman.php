@@ -83,8 +83,13 @@ class ManajemenPeminjaman {
     }
 
     public function updateStatusPeminjaman($peminjamanId, $status) {
-        // Modified method to avoid using oci_set_autocommit
         try {
+            // Validate status first - only allow valid statuses defined in the constraint
+            $valid_statuses = ['Sedang Dipinjam', 'Selesai'];
+            if (!in_array($status, $valid_statuses)) {
+                throw new Exception("Status tidak valid. Status harus berupa: " . implode(", ", $valid_statuses));
+            }
+            
             // Get current status and alat info before updating
             $query_detail = "SELECT p.STATUS_PEMINJAMAN, dp.ALAT_ID, dp.JUMLAH_PINJAM 
                           FROM peminjaman p
@@ -92,7 +97,12 @@ class ManajemenPeminjaman {
                           WHERE p.PEMINJAMAN_ID = :peminjaman_id";
             $stmt_detail = oci_parse($this->conn, $query_detail);
             oci_bind_by_name($stmt_detail, ':peminjaman_id', $peminjamanId);
-            oci_execute($stmt_detail);
+            $exec_detail = oci_execute($stmt_detail, OCI_DEFAULT); // Use OCI_DEFAULT to not auto-commit
+            
+            if (!$exec_detail) {
+                $error = oci_error($stmt_detail);
+                throw new Exception("Error fetching peminjaman details: " . $error['message']);
+            }
             
             $details = [];
             $current_status = null;
@@ -104,6 +114,15 @@ class ManajemenPeminjaman {
                     'jumlah' => $row['JUMLAH_PINJAM']
                 ];
             }
+            
+            // Make sure we found the peminjaman
+            if ($current_status === null) {
+                throw new Exception("Peminjaman ID tidak ditemukan");
+            }
+            
+            // Debug to check the data
+            error_log("Current status: " . $current_status . ", New status: " . $status);
+            error_log("Number of details: " . count($details));
             
             // Update peminjaman status
             $query = "UPDATE peminjaman SET STATUS_PEMINJAMAN = :status";
@@ -118,10 +137,15 @@ class ManajemenPeminjaman {
             $stmt = oci_parse($this->conn, $query);
             oci_bind_by_name($stmt, ':status', $status);
             oci_bind_by_name($stmt, ':peminjaman_id', $peminjamanId);
-            $result = oci_execute($stmt);
+            $result = oci_execute($stmt, OCI_DEFAULT); // Use OCI_DEFAULT to not auto-commit
             
-            // Update stock if changing from another status to "Selesai"
-            if ($result && $status === 'Selesai' && $current_status !== 'Selesai') {
+            if (!$result) {
+                $error = oci_error($stmt);
+                throw new Exception("Error updating peminjaman status: " . $error['message']);
+            }
+            
+            // Update stock if changing from "Sedang Dipinjam" to "Selesai"
+            if ($status === 'Selesai' && $current_status !== 'Selesai' && !empty($details)) {
                 foreach ($details as $detail) {
                     $query_update_stock = "UPDATE alat_mendaki 
                                         SET jumlah_tersedia = jumlah_tersedia + :jumlah 
@@ -129,29 +153,25 @@ class ManajemenPeminjaman {
                     $stmt_update_stock = oci_parse($this->conn, $query_update_stock);
                     oci_bind_by_name($stmt_update_stock, ':jumlah', $detail['jumlah']);
                     oci_bind_by_name($stmt_update_stock, ':alat_id', $detail['alat_id']);
-                    oci_execute($stmt_update_stock);
+                    $exec_stock = oci_execute($stmt_update_stock, OCI_DEFAULT);
+                    
+                    if (!$exec_stock) {
+                        $error = oci_error($stmt_update_stock);
+                        throw new Exception("Error updating stock: " . $error['message']);
+                    }
                 }
             }
             
-            // If changing from "Ditolak" to something else, decrease stock if needed
-            if ($result && $current_status === 'Ditolak' && $status !== 'Ditolak') {
-                foreach ($details as $detail) {
-                    $query_update_stock = "UPDATE alat_mendaki 
-                                        SET jumlah_tersedia = jumlah_tersedia - :jumlah 
-                                        WHERE alat_id = :alat_id";
-                    $stmt_update_stock = oci_parse($this->conn, $query_update_stock);
-                    oci_bind_by_name($stmt_update_stock, ':jumlah', $detail['jumlah']);
-                    oci_bind_by_name($stmt_update_stock, ':alat_id', $detail['alat_id']);
-                    oci_execute($stmt_update_stock);
-                }
-            }
-            
-            // Commit transaction
+            // Commit transaction if all operations successful
             $commit = oci_commit($this->conn);
+            if (!$commit) {
+                $error = oci_error($this->conn);
+                throw new Exception("Error committing transaction: " . $error['message']);
+            }
             
             return [
-                'result' => $result && $commit,
-                'pesan' => $result ? 'Status peminjaman berhasil diupdate' : 'Gagal mengupdate status peminjaman'
+                'result' => true,
+                'pesan' => 'Status peminjaman berhasil diupdate menjadi ' . $status
             ];
         } catch (Exception $e) {
             // Rollback transaction if there's an error
@@ -168,7 +188,7 @@ class ManajemenPeminjaman {
         $query = "SELECT p.PEMINJAMAN_ID, dp.ALAT_ID, dp.JUMLAH_PINJAM
                  FROM peminjaman p
                  JOIN detail_peminjaman dp ON p.PEMINJAMAN_ID = dp.PEMINJAMAN_ID
-                 WHERE p.STATUS_PEMINJAMAN = 'Disetujui'
+                 WHERE p.STATUS_PEMINJAMAN = 'Sedang Dipinjam'
                  AND dp.TANGGAL_SELESAI < TRUNC(SYSDATE)
                  AND p.TANGGAL_KEMBALI IS NULL";
                  
@@ -217,97 +237,229 @@ $daftarPeminjaman = $manajemenPeminjaman->getDaftarPeminjaman($status_filter);
     <title>Manajemen Peminjaman - Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <style>
+        .gradient-header {
+            background: linear-gradient(to right,rgb(31, 41, 55),rgb(31, 41, 55));
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .status-pill {
+            transition: all 0.2s ease;
+        }
+        .status-pill:hover {
+            transform: scale(1.05);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c5c5c5;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a0a0a0;
+        }
+    </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 font-sans">
     <?php include 'components/sidebar.php'; ?>
 
     <!-- Main Content -->
-    <div class="ml-0 md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
+    <div class="ml-0 md:ml-64 p-4 md:p-8 pt-16 md:pt-8 transition-all duration-300">
         <div class="container mx-auto">
-            <h1 class="text-2xl lg:text-3xl font-bold text-gray-800 mb-4 lg:mb-6">Manajemen Peminjaman</h1>
+            <!-- Header with gradient background -->
+            <div class="gradient-header rounded-lg shadow-lg p-6 mb-6 text-white flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl lg:text-3xl font-bold mb-1">Manajemen Peminjaman</h1>
+                    <p class="text-blue-100 text-sm lg:text-base">Kelola semua aktivitas peminjaman dengan mudah</p>
+                </div>
+                <div class="hidden md:block">
+                    <i class="fas fa-book-reader text-4xl text-blue-100 opacity-80"></i>
+                </div>
+            </div>
 
+            <!-- Alert Messages -->
             <?php if(!empty($pesan)): ?>
-                <div class="<?= $result ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?> p-3 lg:p-4 rounded mb-4 lg:mb-6 text-sm lg:text-base">
+                <div class="<?= $result ? 'bg-green-100 text-green-800 border-l-4 border-green-500' : 'bg-red-100 text-red-800 border-l-4 border-red-500' ?> p-4 rounded shadow-md mb-6 flex items-center text-sm lg:text-base animate-fade-in">
+                    <i class="<?= $result ? 'fas fa-check-circle' : 'fas fa-exclamation-circle' ?> mr-3 text-xl"></i>
                     <?= $pesan ?>
                 </div>
             <?php endif; ?>
             
             <?php if($expired_updated > 0): ?>
-                <div class="bg-blue-100 text-blue-800 p-3 lg:p-4 rounded mb-4 lg:mb-6 text-sm lg:text-base">
+                <div class="bg-blue-100 text-blue-800 border-l-4 border-blue-500 p-4 rounded shadow-md mb-6 flex items-center text-sm lg:text-base">
+                    <i class="fas fa-info-circle mr-3 text-xl"></i>
                     <?= $expired_updated ?> peminjaman yang melewati tanggal pengembalian telah otomatis diupdate menjadi Selesai.
                 </div>
             <?php endif; ?>
 
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <!-- Total Peminjaman Card -->
+                <div class="bg-white rounded-lg shadow-md p-5 card-hover border-t-4 border-blue-800">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-gray-500 text-sm font-medium mb-1">Total Peminjaman</h3>
+                            <p class="text-2xl font-bold text-gray-800"><?= count($daftarPeminjaman) ?></p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <i class="fas fa-book text-blue-600"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sedang Dipinjam Card -->
+                <div class="bg-white rounded-lg shadow-md p-5 card-hover border-t-4 border-green-800">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-gray-500 text-sm font-medium mb-1">Sedang Dipinjam</h3>
+                            <p class="text-2xl font-bold text-gray-800">
+                                <?php 
+                                $count = 0;
+                                foreach($daftarPeminjaman as $p) {
+                                    if($p['STATUS_PEMINJAMAN'] == 'Sedang Dipinjam') $count++;
+                                }
+                                echo $count;
+                                ?>
+                            </p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <i class="fas fa-clock text-green-600"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Selesai Card -->
+                <div class="bg-white rounded-lg shadow-md p-5 card-hover border-t-4 border-indigo-800">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-gray-500 text-sm font-medium mb-1">Telah Selesai</h3>
+                            <p class="text-2xl font-bold text-gray-800">
+                                <?php 
+                                $count = 0;
+                                foreach($daftarPeminjaman as $p) {
+                                    if($p['STATUS_PEMINJAMAN'] == 'Selesai') $count++;
+                                }
+                                echo $count;
+                                ?>
+                            </p>
+                        </div>
+                        <div class="bg-indigo-100 p-3 rounded-full">
+                            <i class="fas fa-check-circle text-indigo-600"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Filter Status - Responsive -->
-            <div class="mb-4 lg:mb-6">
+            <div class="mb-6">
                 <?php 
                 $statuses = [
                     null => 'Semua',
-                    'Diajukan' => 'Diajukan',
-                    'Disetujui' => 'Disetujui', 
-                    'Ditolak' => 'Ditolak', 
+                    'Sedang Dipinjam' => 'Sedang Dipinjam',
                     'Selesai' => 'Selesai'
                 ];
                 ?>
-                <!-- Mobile: Dropdown -->
+                <!-- Mobile: Dropdown with custom styling -->
                 <div class="block lg:hidden mb-4">
-                    <select id="mobile-filter" class="w-full p-3 border border-gray-300 rounded-lg bg-white text-gray-700" onchange="window.location.href = this.value">
-                        <?php foreach($statuses as $status => $label): ?>
-                            <option value="?status=<?= $status ?? '' ?>" <?= $status_filter === $status ? 'selected' : '' ?>>
-                                <?= $label ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <div class="relative">
+                        <select id="mobile-filter" class="w-full p-3 border border-gray-300 rounded-lg bg-white text-gray-700 appearance-none pr-10 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" onchange="window.location.href = this.value">
+                            <?php foreach($statuses as $status => $label): ?>
+                                <option value="?status=<?= $status ?? '' ?>" <?= $status_filter === $status ? 'selected' : '' ?>>
+                                    <?= $label ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
+                            <i class="fas fa-chevron-down text-gray-500"></i>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Desktop: Buttons -->
-                <div class="hidden lg:flex space-x-2">
+                <!-- Desktop: Buttons with improved styling -->
+                <div class="hidden lg:flex space-x-3">
                     <?php foreach($statuses as $status => $label): ?>
                         <a href="?status=<?= $status ?? '' ?>" 
-                           class="px-4 py-2 rounded-md transition <?= 
-                               $status_filter === $status ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                           class="px-5 py-2.5 rounded-md transition flex items-center space-x-2 <?= 
+                               $status_filter === $status ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
                            ?>">
-                            <?= $label ?>
+                            <i class="fas <?= 
+                                $label == 'Semua' ? 'fa-list' : 
+                                ($label == 'Sedang Dipinjam' ? 'fa-clock' : 'fa-check-circle') 
+                            ?>"></i>
+                            <span><?= $label ?></span>
                         </a>
                     <?php endforeach; ?>
                 </div>
             </div>
 
-            <!-- Table Container -->
-            <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                <!-- Desktop Table -->
-                <div class="hidden lg:block overflow-x-auto">
+            <!-- Table Container with improved styling -->
+            <div class="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200">
+                <!-- Table Header -->
+                <div class="p-5 border-b border-gray-200 flex justify-between items-center">
+                    <h2 class="text-lg font-semibold text-gray-800">Daftar Peminjaman</h2>
+                    <div class="text-sm text-gray-500">
+                        <i class="fas fa-calendar-alt mr-1"></i> <?= date('d M Y') ?>
+                    </div>
+                </div>
+                
+                <!-- Desktop Table with improved styling -->
+                <div class="hidden lg:block overflow-x-auto custom-scrollbar">
                     <table class="w-full">
                         <thead>
-                            <tr class="bg-gray-100 text-gray-600">
-                                <th class="py-3 px-4 text-left font-semibold">ID Peminjaman</th>
-                                <th class="py-3 px-4 text-left font-semibold">Nama Peminjam</th>
-                                <th class="py-3 px-4 text-left font-semibold">Tanggal Pinjam</th>
-                                <th class="py-3 px-4 text-left font-semibold">Tanggal Kembali</th>
-                                <th class="py-3 px-4 text-left font-semibold">Status</th>
-                                <th class="py-3 px-4 text-left font-semibold">Aksi</th>
+                            <tr class="bg-gray-50 text-gray-600">
+                                <th class="py-4 px-6 text-left font-semibold">ID Peminjaman</th>
+                                <th class="py-4 px-6 text-left font-semibold">Nama Peminjam</th>
+                                <th class="py-4 px-6 text-left font-semibold">Tanggal Pinjam</th>
+                                <th class="py-4 px-6 text-left font-semibold">Tanggal Kembali</th>
+                                <th class="py-4 px-6 text-left font-semibold">Status</th>
+                                <th class="py-4 px-6 text-center font-semibold">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach($daftarPeminjaman as $peminjaman): ?>
-                            <tr class="border-b border-gray-200 hover:bg-gray-50">
-                                <td class="py-3 px-4"><?= $peminjaman['PEMINJAMAN_ID'] ?></td>
-                                <td class="py-3 px-4"><?= $peminjaman['NAMA_LENGKAP'] ?></td>
-                                <td class="py-3 px-4"><?= date('d M Y', strtotime($peminjaman['TANGGAL_PINJAM'])) ?></td>
-                                <td class="py-3 px-4"><?= !empty($peminjaman['TANGGAL_KEMBALI']) ? date('d M Y', strtotime($peminjaman['TANGGAL_KEMBALI'])) : '-' ?></td>
-                                <td class="py-3 px-4">
+                            <?php foreach($daftarPeminjaman as $index => $peminjaman): ?>
+                            <tr class="<?= $index % 2 == 0 ? 'bg-white' : 'bg-gray-50' ?> hover:bg-blue-50 transition-colors">
+                                <td class="py-4 px-6 font-medium"><?= $peminjaman['PEMINJAMAN_ID'] ?></td>
+                                <td class="py-4 px-6"><?= $peminjaman['NAMA_LENGKAP'] ?></td>
+                                <td class="py-4 px-6">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-calendar-plus text-blue-500 mr-2"></i>
+                                        <?= date('d M Y', strtotime($peminjaman['TANGGAL_PINJAM'])) ?>
+                                    </div>
+                                </td>
+                                <td class="py-4 px-6">
+                                    <?php if(!empty($peminjaman['TANGGAL_KEMBALI'])): ?>
+                                    <div class="flex items-center">
+                                        <i class="fas fa-calendar-check text-green-500 mr-2"></i>
+                                        <?= date('d M Y', strtotime($peminjaman['TANGGAL_KEMBALI'])) ?>
+                                    </div>
+                                    <?php else: ?>
+                                    <span class="text-gray-400">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="py-4 px-6">
                                     <span class="<?= 
-                                        $peminjaman['STATUS_PEMINJAMAN'] == 'Diajukan' ? 'bg-yellow-100 text-yellow-800' : 
-                                        ($peminjaman['STATUS_PEMINJAMAN'] == 'Disetujui' ? 'bg-green-100 text-green-800' : 
-                                        ($peminjaman['STATUS_PEMINJAMAN'] == 'Ditolak' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'))
-                                    ?> px-2 py-1 rounded-full text-xs font-medium">
+                                        $peminjaman['STATUS_PEMINJAMAN'] == 'Sedang Dipinjam' ? 'bg-green-100 text-green-800' : 
+                                        'bg-blue-100 text-blue-800'
+                                    ?> px-3 py-1.5 rounded-full text-xs font-medium inline-flex items-center status-pill">
+                                        <i class="<?= $peminjaman['STATUS_PEMINJAMAN'] == 'Sedang Dipinjam' ? 'fas fa-clock' : 'fas fa-check-circle' ?> mr-1"></i>
                                         <?= $peminjaman['STATUS_PEMINJAMAN'] ?>
                                     </span>
                                 </td>
-                                <td class="py-3 px-4">
+                                <td class="py-4 px-6 text-center">
                                     <button onclick="showDetailPeminjaman(<?= $peminjaman['PEMINJAMAN_ID'] ?>)" 
-                                            class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition">
-                                        Detail
+                                            class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition flex items-center mx-auto">
+                                        <i class="fas fa-eye mr-1.5"></i> Detail
                                     </button>
                                 </td>
                             </tr>
@@ -316,40 +468,52 @@ $daftarPeminjaman = $manajemenPeminjaman->getDaftarPeminjaman($status_filter);
                     </table>
                 </div>
 
-                <!-- Mobile Cards -->
-                <div class="lg:hidden">
+                <!-- Mobile Cards with improved styling -->
+                <div class="lg:hidden divide-y divide-gray-200">
                     <?php foreach($daftarPeminjaman as $peminjaman): ?>
-                    <div class="border-b border-gray-200 p-4 last:border-b-0">
-                        <div class="flex flex-col space-y-3">
+                    <div class="p-4 card-hover">
+                        <div class="flex flex-col space-y-4">
                             <!-- Header dengan ID dan Status -->
                             <div class="flex justify-between items-start">
                                 <div>
-                                    <p class="text-sm text-gray-500">ID Peminjaman</p>
-                                    <p class="font-semibold text-gray-800"><?= $peminjaman['PEMINJAMAN_ID'] ?></p>
+                                    <div class="flex items-center">
+                                        <i class="fas fa-bookmark text-blue-500 mr-2"></i>
+                                        <p class="text-sm text-gray-500">ID Peminjaman</p>
+                                    </div>
+                                    <p class="font-semibold text-gray-800 text-lg"><?= $peminjaman['PEMINJAMAN_ID'] ?></p>
                                 </div>
                                 <span class="<?= 
-                                    $peminjaman['STATUS_PEMINJAMAN'] == 'Diajukan' ? 'bg-yellow-100 text-yellow-800' : 
-                                    ($peminjaman['STATUS_PEMINJAMAN'] == 'Disetujui' ? 'bg-green-100 text-green-800' : 
-                                    ($peminjaman['STATUS_PEMINJAMAN'] == 'Ditolak' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'))
-                                ?> px-2 py-1 rounded-full text-xs font-medium">
+                                    $peminjaman['STATUS_PEMINJAMAN'] == 'Sedang Dipinjam' ? 'bg-green-100 text-green-800' : 
+                                    'bg-blue-100 text-blue-800'
+                                ?> px-3 py-1.5 rounded-full text-xs font-medium inline-flex items-center status-pill">
+                                    <i class="<?= $peminjaman['STATUS_PEMINJAMAN'] == 'Sedang Dipinjam' ? 'fas fa-clock' : 'fas fa-check-circle' ?> mr-1"></i>
                                     <?= $peminjaman['STATUS_PEMINJAMAN'] ?>
                                 </span>
                             </div>
 
                             <!-- Nama Peminjam -->
-                            <div>
-                                <p class="text-sm text-gray-500">Nama Peminjam</p>
+                            <div class="bg-gray-50 p-3 rounded-lg">
+                                <div class="flex items-center mb-1.5">
+                                    <i class="fas fa-user text-indigo-500 mr-2"></i>
+                                    <p class="text-sm text-gray-500">Nama Peminjam</p>
+                                </div>
                                 <p class="font-medium text-gray-800"><?= $peminjaman['NAMA_LENGKAP'] ?></p>
                             </div>
 
-                            <!-- Tanggal dalam satu baris -->
+                            <!-- Tanggal dalam cards terpisah -->
                             <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <p class="text-sm text-gray-500">Tanggal Pinjam</p>
+                                <div class="bg-blue-50 p-3 rounded-lg">
+                                    <div class="flex items-center mb-1.5">
+                                        <i class="fas fa-calendar-plus text-blue-500 mr-2"></i>
+                                        <p class="text-xs text-gray-500">Tanggal Pinjam</p>
+                                    </div>
                                     <p class="text-sm font-medium text-gray-800"><?= date('d M Y', strtotime($peminjaman['TANGGAL_PINJAM'])) ?></p>
                                 </div>
-                                <div>
-                                    <p class="text-sm text-gray-500">Tanggal Kembali</p>
+                                <div class="bg-green-50 p-3 rounded-lg">
+                                    <div class="flex items-center mb-1.5">
+                                        <i class="fas fa-calendar-check text-green-500 mr-2"></i>
+                                        <p class="text-xs text-gray-500">Tanggal Kembali</p>
+                                    </div>
                                     <p class="text-sm font-medium text-gray-800"><?= !empty($peminjaman['TANGGAL_KEMBALI']) ? date('d M Y', strtotime($peminjaman['TANGGAL_KEMBALI'])) : '-' ?></p>
                                 </div>
                             </div>
@@ -357,30 +521,63 @@ $daftarPeminjaman = $manajemenPeminjaman->getDaftarPeminjaman($status_filter);
                             <!-- Button Detail -->
                             <div class="pt-2">
                                 <button onclick="showDetailPeminjaman(<?= $peminjaman['PEMINJAMAN_ID'] ?>)" 
-                                        class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition">
-                                    <i class="fas fa-eye mr-2"></i>Detail
+                                        class="w-full bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 transition flex items-center justify-center shadow-md">
+                                    <i class="fas fa-eye mr-2"></i>Lihat Detail Peminjaman
                                 </button>
                             </div>
                         </div>
                     </div>
                     <?php endforeach; ?>
                 </div>
+                
+                <!-- Empty State -->
+                <?php if(empty($daftarPeminjaman)): ?>
+                <div class="p-8 text-center">
+                    <div class="bg-gray-100 p-6 rounded-full inline-block mb-4">
+                        <i class="fas fa-search text-4xl text-gray-400"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-700 mb-2">Data Peminjaman Kosong</h3>
+                    <p class="text-gray-500 max-w-md mx-auto">Tidak ada data peminjaman yang sesuai dengan filter yang dipilih.</p>
+                </div>
+                <?php endif; ?>
+            </div>
+            
+            <!-- Pagination (jika dibutuhkan) -->
+            <div class="mt-6 flex justify-center">
+                <nav class="inline-flex rounded-md shadow">
+                    <a href="#" class="py-2 px-4 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 text-gray-500">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    <a href="#" class="py-2 px-4 bg-blue-600 border border-blue-600 text-white hover:bg-blue-700">1</a>
+                    <a href="#" class="py-2 px-4 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700">2</a>
+                    <a href="#" class="py-2 px-4 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700">3</a>
+                    <a href="#" class="py-2 px-4 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 text-gray-500">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </nav>
             </div>
         </div>
 
         <!-- Modal Detail Peminjaman -->
         <div id="modal-detail-peminjaman" 
-             class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-auto">
-                <div class="p-4 lg:p-6">
-                    <div class="flex justify-between items-center border-b pb-3 mb-4">
-                        <h2 class="text-lg lg:text-xl font-semibold">Detail Peminjaman</h2>
-                        <button onclick="closeDetailModal()" 
-                                class="text-gray-500 hover:text-gray-700 p-1">
-                            <i class="fas fa-times text-xl lg:text-2xl"></i>
-                        </button>
+             class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-auto transform transition-all duration-300 scale-95 opacity-0" id="modal-content">
+                <div class="relative">
+                    <div class="p-5 lg:p-6 border-b border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                                <i class="fas fa-clipboard-list text-blue-500 mr-2"></i>
+                                Detail Peminjaman
+                            </h2>
+                            <button onclick="closeDetailModal()" 
+                                    class="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div id="detail-peminjaman-content"></div>
+                    <div id="detail-peminjaman-content" class="p-5 lg:p-6 max-h-[70vh] overflow-y-auto custom-scrollbar"></div>
+                    <div class="p-5 lg:p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+                    </div>
                 </div>
             </div>
         </div>
@@ -394,12 +591,30 @@ $daftarPeminjaman = $manajemenPeminjaman->getDaftarPeminjaman($status_filter);
             .then(response => response.text())
             .then(html => {
                 document.getElementById('detail-peminjaman-content').innerHTML = html;
-                document.getElementById('modal-detail-peminjaman').classList.remove('hidden');
+                const modal = document.getElementById('modal-detail-peminjaman');
+                const modalContent = document.getElementById('modal-content');
+                
+                modal.classList.remove('hidden');
+                
+                // Animation
+                setTimeout(() => {
+                    modalContent.classList.remove('scale-95', 'opacity-0');
+                    modalContent.classList.add('scale-100', 'opacity-100');
+                }, 10);
             });
     }
 
     function closeDetailModal() {
-        document.getElementById('modal-detail-peminjaman').classList.add('hidden');
+        const modal = document.getElementById('modal-detail-peminjaman');
+        const modalContent = document.getElementById('modal-content');
+        
+        // Animation
+        modalContent.classList.remove('scale-100', 'opacity-100');
+        modalContent.classList.add('scale-95', 'opacity-0');
+        
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
     }
 
     // Close modal when clicking outside
