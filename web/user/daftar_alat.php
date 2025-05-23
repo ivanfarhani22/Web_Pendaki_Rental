@@ -458,6 +458,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['pinjam_alat'])) {
                         <option value="Transfer Bank">Transfer Bank (Mandiri - 1780004013)</option>
                         <option value="E-Wallet">E-Wallet (DANA, OVO, GoPay, ShopeePay - 082247219152)</option>
                     </select>
+                    <p class="text-sm text-gray-700 italic">* Catatan: Pembayaran dapat dilakukan dengan uang muka (DP) atau pelunasan langsung.</p>
                 </div>
 
                 <div class="mt-4">
@@ -478,9 +479,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['pinjam_alat'])) {
 
                 <div class="mt-6 flex items-center space-x-3">
                     <button type="submit" class="flex-1 bg-green-700 text-white py-3 rounded-md hover:bg-green-900 transition flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                        </svg>
                         Konfirmasi Peminjaman
                     </button>
                     <button type="button" id="batalkanBtn" class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-md hover:bg-gray-300 transition">
