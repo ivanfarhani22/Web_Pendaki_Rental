@@ -455,9 +455,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['pinjam_alat'])) {
                     <label class="block text-gray-700 font-bold mb-2">Metode Pembayaran</label>
                     <select name="metode_pembayaran" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
                         <option value="">-- Pilih Metode Pembayaran --</option>
-                        <option value="Transfer Bank">Transfer Bank</option>
-                        <option value="QRIS">QRIS</option>
-                        <option value="E-Wallet">E-Wallet</option>
+                        <option value="Transfer Bank">Transfer Bank (Mandiri - 1780004013)</option>
+                        <option value="E-Wallet">E-Wallet (DANA, OVO, GoPay, ShopeePay - 082247219152)</option>
                     </select>
                 </div>
 

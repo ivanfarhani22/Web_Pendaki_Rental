@@ -278,7 +278,7 @@ $totalCategories = $homePage->getCategories();
                 </div>
             </div>
 
-            <!-- Back Side - Dashboard -->
+<!-- Back Side - Dashboard -->
             <div class="back pt-20 pb-10">
 
                 <!-- Floating Particles for Dashboard -->
@@ -288,62 +288,62 @@ $totalCategories = $homePage->getCategories();
                     <div class="particle w-3 h-3" style="left: 60%; animation-delay: 1s; animation-duration: 26s;"></div>
                 </div>
                 
-                <div class="container mx-auto px-6 relative z-10 h-full flex items-center justify-center">
-                    <div class="dashboard-card p-8 mx-4">
-                        <div class="text-center mb-8">
+                <div class="hero-bg min-h-screen container mx-auto px-4 sm:px-6 relative z-10 flex items-center justify-center">
+                    <div class="dashboard-card p-4 sm:p-6 lg:p-8 mx-2 sm:mx-4 w-full max-w-4xl">
+                        <div class="text-center mb-6 sm:mb-8">
                              <!-- Back Button -->
-                            <button onclick="flipToHero()" class="back-button text-green-600 px-4 py-2 rounded-full font-semibold text-lg">
+                            <button onclick="flipToHero()" class="back-button text-green-600 px-3 sm:px-4 py-2 rounded-full font-semibold text-base sm:text-lg mb-4">
                                 <i class="fas fa-arrow-left mr-2 text-green-600"></i>
                                 Kembali
                             </button>
-                            <div class="w-20 h-20 bg-gradient-to-r from-teal-500 to-green-600 rounded-full mx-auto mb-4 flex items-center justify-center">
-                                <i class="fas fa-user text-white text-2xl"></i>
+                            <div class="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-teal-500 to-green-600 rounded-full mx-auto mb-4 flex items-center justify-center">
+                                <i class="fas fa-user text-white text-xl sm:text-2xl"></i>
                             </div>
-                            <h2 class="text-3xl font-bold text-gray-800 mb-2">Dashboard Anda</h2>
-                            <p class="text-gray-600">Selamat datang kembali, <?= htmlspecialchars($userProfile['NAMA_LENGKAP']) ?>!</p>
+                            <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Dashboard Anda</h2>
+                            <p class="text-sm sm:text-base text-gray-600 px-4">Selamat datang kembali, <?= htmlspecialchars($userProfile['NAMA_LENGKAP']) ?>!</p>
                         </div>
 
                         <!-- Quick Stats -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                            <div class="bg-gradient-to-r from-green-500 to-emerald-600 p-6 rounded-xl text-white text-center transform hover:scale-105 transition-transform">
-                                <i class="fas fa-list-alt text-2xl mb-3"></i>
-                                <div class="text-2xl font-bold mb-1"><?= $userStats['TOTAL_PEMINJAMAN'] ?: '0' ?></div>
-                                <div class="text-green-100 text-sm">Total Peminjaman</div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+                            <div class="bg-gradient-to-r from-green-500 to-emerald-600 p-4 sm:p-6 rounded-xl text-white text-center transform hover:scale-105 transition-transform">
+                                <i class="fas fa-list-alt text-xl sm:text-2xl mb-2 sm:mb-3"></i>
+                                <div class="text-xl sm:text-2xl font-bold mb-1"><?= $userStats['TOTAL_PEMINJAMAN'] ?: '0' ?></div>
+                                <div class="text-green-100 text-xs sm:text-sm">Total Peminjaman</div>
                             </div>
-                            <div class="bg-gradient-to-r from-blue-500 to-cyan-600 p-6 rounded-xl text-white text-center transform hover:scale-105 transition-transform">
-                                <i class="fas fa-hiking text-2xl mb-3"></i>
-                                <div class="text-2xl font-bold mb-1"><?= $userStats['SEDANG_DIPINJAM'] ?: '0' ?></div>
-                                <div class="text-blue-100 text-sm">Sedang Dipinjam</div>
+                            <div class="bg-gradient-to-r from-blue-500 to-cyan-600 p-4 sm:p-6 rounded-xl text-white text-center transform hover:scale-105 transition-transform">
+                                <i class="fas fa-hiking text-xl sm:text-2xl mb-2 sm:mb-3"></i>
+                                <div class="text-xl sm:text-2xl font-bold mb-1"><?= $userStats['SEDANG_DIPINJAM'] ?: '0' ?></div>
+                                <div class="text-blue-100 text-xs sm:text-sm">Sedang Dipinjam</div>
                             </div>
-                            <div class="bg-gradient-to-r from-purple-500 to-pink-600 p-6 rounded-xl text-white text-center transform hover:scale-105 transition-transform">
-                                <i class="fas fa-check-circle text-2xl mb-3"></i>
-                                <div class="text-2xl font-bold mb-1"><?= $userStats['TOTAL_SELESAI'] ?: '0' ?></div>
-                                <div class="text-purple-100 text-sm">Selesai</div>
+                            <div class="bg-gradient-to-r from-purple-500 to-pink-600 p-4 sm:p-6 rounded-xl text-white text-center transform hover:scale-105 transition-transform sm:col-span-2 lg:col-span-1">
+                                <i class="fas fa-check-circle text-xl sm:text-2xl mb-2 sm:mb-3"></i>
+                                <div class="text-xl sm:text-2xl font-bold mb-1"><?= $userStats['TOTAL_SELESAI'] ?: '0' ?></div>
+                                <div class="text-purple-100 text-xs sm:text-sm">Selesai</div>
                             </div>
                         </div>
 
                         <!-- Quick Actions -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                            <a href="daftar_alat.php" class="group bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-xl p-6 transition-all duration-300 hover:shadow-lg">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                            <a href="daftar_alat.php" class="group bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-xl p-4 sm:p-6 transition-all duration-300 hover:shadow-lg">
                                 <div class="flex items-center">
-                                    <div class="bg-teal-500 p-3 rounded-full mr-4 group-hover:scale-110 transition-transform">
-                                        <i class="fas fa-shopping-cart text-white"></i>
+                                    <div class="bg-teal-500 p-2 sm:p-3 rounded-full mr-3 sm:mr-4 group-hover:scale-110 transition-transform flex-shrink-0">
+                                        <i class="fas fa-shopping-cart text-white text-sm sm:text-base"></i>
                                     </div>
-                                    <div>
-                                        <h3 class="font-semibold text-gray-800 group-hover:text-teal-700">Sewa Alat Baru</h3>
-                                        <p class="text-sm text-gray-600">Pilih peralatan untuk petualangan Anda</p>
+                                    <div class="min-w-0 flex-1">
+                                        <h3 class="font-semibold text-sm sm:text-base text-gray-800 group-hover:text-teal-700">Sewa Alat Baru</h3>
+                                        <p class="text-xs sm:text-sm text-gray-600">Pilih peralatan untuk petualangan Anda</p>
                                     </div>
                                 </div>
                             </a>
                             
-                            <a href="riwayat_peminjaman.php" class="group bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl p-6 transition-all duration-300 hover:shadow-lg">
+                            <a href="riwayat_peminjaman.php" class="group bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl p-4 sm:p-6 transition-all duration-300 hover:shadow-lg">
                                 <div class="flex items-center">
-                                    <div class="bg-blue-500 p-3 rounded-full mr-4 group-hover:scale-110 transition-transform">
-                                        <i class="fas fa-history text-white"></i>
+                                    <div class="bg-blue-500 p-2 sm:p-3 rounded-full mr-3 sm:mr-4 group-hover:scale-110 transition-transform flex-shrink-0">
+                                        <i class="fas fa-history text-white text-sm sm:text-base"></i>
                                     </div>
-                                    <div>
-                                        <h3 class="font-semibold text-gray-800 group-hover:text-blue-700">Riwayat Peminjaman</h3>
-                                        <p class="text-sm text-gray-600">Lihat aktivitas peminjaman Anda</p>
+                                    <div class="min-w-0 flex-1">
+                                        <h3 class="font-semibold text-sm sm:text-base text-gray-800 group-hover:text-blue-700">Riwayat Peminjaman</h3>
+                                        <p class="text-xs sm:text-sm text-gray-600">Lihat aktivitas peminjaman Anda</p>
                                     </div>
                                 </div>
                             </a>
