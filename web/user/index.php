@@ -76,7 +76,7 @@ $totalCategories = $homePage->getCategories();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MountGear Rental - Sewa Alat Mendaki Terpercaya</title>
+    <title>PendakiGear Rental - Sewa Alat Mendaki Terpercaya</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="icon" href="/pendaki_gear/web/favicon.ico" type="image/x-icon">
@@ -131,7 +131,7 @@ $totalCategories = $homePage->getCategories();
         }
         
         .dashboard-card {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.48);
             backdrop-filter: blur(10px);
             border-radius: 20px;
             box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
@@ -278,7 +278,7 @@ $totalCategories = $homePage->getCategories();
                 </div>
             </div>
 
-<!-- Back Side - Dashboard -->
+            <!-- Back Side - Dashboard -->
             <div class="back pt-20 pb-10">
 
                 <!-- Floating Particles for Dashboard -->
@@ -515,15 +515,15 @@ $totalCategories = $homePage->getCategories();
                             <ul class="space-y-3 text-gray-700">
                                 <li class="flex items-start">
                                     <i class="fas fa-calendar-check text-orange-500 mt-1 mr-3 flex-shrink-0"></i>
-                                    <span><strong>Untuk menghindari kehabisan stok, sangat disarankan untuk booking terlebih dahulu</strong> minimal H-1 sebelum tanggal peminjaman</span>
+                                    <span><strong>Untuk menghindari kehabisan stok, sangat disarankan untuk booking secara online terlebih dahulu</strong></span>
                                 </li>
                                 <li class="flex items-start">
                                     <i class="fas fa-exclamation-circle text-red-500 mt-1 mr-3 flex-shrink-0"></i>
-                                    <span>Jika alat yang diinginkan tidak tersedia, kami akan konfirmasi untuk penggantian atau pengembalian DP</span>
+                                    <span>Jika alat yang diinginkan tidak tersedia, kami menyediakan alat lain yang tersedia</span>
                                 </li>
                                 <li class="flex items-start">
                                     <i class="fas fa-phone text-orange-500 mt-1 mr-3 flex-shrink-0"></i>
-                                    <span>Untuk booking mendadak (hari H), silakan hubungi kami terlebih dahulu untuk mengecek ketersediaan</span>
+                                    <span>Untuk booking secara offline, silakan hubungi kami terlebih dahulu dan silahkan mengecek di website kami untuk melihat ketersediaan</span>
                                 </li>
                             </ul>
                         </div>
