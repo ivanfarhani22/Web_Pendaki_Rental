@@ -268,11 +268,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['pinjam_alat'])) {
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
 </head>
-
 <body class="bg-gradient-to-br from-green-50 via-teal-50 to-blue-100 min-h-screen">
     <?php include '../includes/header.php'; ?>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pt-32">
         <div class="bg-white shadow-xl rounded-xl overflow-hidden border border-gray-100">
             <div class="bg-gradient-to-r from-green-900 to-teal-900 px-6 py-8">
                 <h1 class="text-3xl font-bold text-white text-center flex items-center justify-center">

@@ -16,15 +16,15 @@ $is_logged_in = isset($_SESSION['user_id']); // Cek apakah user sudah login
     <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
 </head>
 <body class="bg-gray-50 text-gray-900">
-    <!-- Header -->
-    <header class="bg-gradient-to-r from-teal-900 to-green-900 shadow-lg relative">
+    <!-- Header - Changed to fixed position -->
+    <header class="bg-gradient-to-r from-teal-900 to-green-900 shadow-lg fixed top-0 left-0 right-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center py-4">
                 <!-- Logo -->
                 <div class="flex justify-start lg:w-0 lg:flex-1">
                     <a href="../user/index.php" class="flex items-center">
                         <img src="https://images.squarespace-cdn.com/content/v1/66b9939f8309ad3bb59cd88f/1732152083816-0YAKHS96UHIJOUMKZ89D/generalists-icon-hiking.png" alt="Pendaki Rental Logo" class="h-10 w-10 mr-2">
-                        <span class="text-2xl font-bold text-white">Pendaki Rental</span>
+                        <span class="text-2xl font-bold text-white">Pendaki Gear</span>
                     </a>
                 </div>
 
@@ -40,7 +40,7 @@ $is_logged_in = isset($_SESSION['user_id']); // Cek apakah user sudah login
                 <!-- Desktop Navigation -->
                 <nav class="hidden md:flex space-x-6">
                     <?php if($is_logged_in): ?>
-                        <a href="../user/index.php" class="text-white hover:bg-green-700 px-3 py-2 rounded-md transition">Dashboard</a>
+                        <a href="../user/index.php" class="text-white hover:bg-green-700 px-3 py-2 rounded-md transition">Home</a>
                         <a href="../user/daftar_alat.php" class="text-white hover:bg-green-700 px-3 py-2 rounded-md transition">Daftar Alat</a>
                         <a href="../user/riwayat_peminjaman.php" class="text-white hover:bg-green-700 px-3 py-2 rounded-md transition">Riwayat Peminjaman</a>
                         <a href="../user/profile.php" class="text-white hover:bg-green-700 px-3 py-2 rounded-md transition">Profil</a>
@@ -79,7 +79,7 @@ $is_logged_in = isset($_SESSION['user_id']); // Cek apakah user sudah login
         </div>
     </header>
 
-    <!-- Main Content Placeholder -->
+    <!-- Added padding to push content below the fixed header -->
     <main>
         <!-- Your page content goes here -->
     </main>

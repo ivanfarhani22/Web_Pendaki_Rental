@@ -138,124 +138,174 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Profil Pengguna</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profil Pengguna - Peminjaman Alat Mendaki</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gradient-to-br from-green-50 via-teal-50 to-blue-100 min-h-screen">
+
     <?php include '../includes/header.php'; ?>
 
-    <div class="container mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold mb-6 text-center">Profil Pengguna</h1>
-
-        <?php if(!empty($pesan)): ?>
-            <div class="max-w-xl mx-auto mb-6 <?= $hasil ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700' ?> px-4 py-3 rounded relative" role="alert">
-                <?= htmlspecialchars($pesan) ?>
+    <div class="container mx-auto px-4 py-8 pt-32">
+        <div class="max-w-5xl mx-auto bg-white bg-opacity-90 backdrop-filter backdrop-blur-sm rounded-xl shadow-lg p-6 mb-8">
+            <div class="flex items-center justify-center mb-6">
+                <div class="bg-green-100 rounded-full p-3 mr-3">
+                    <i class="fas fa-user-circle text-green-600 text-4xl"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-800">Profil Pengguna</h1>
             </div>
-        <?php endif; ?>
-
-        <div class="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            <div class="bg-white shadow-md rounded-lg p-6">
-                <h2 class="text-2xl font-semibold mb-4">Informasi Akun</h2>
-                <form method="POST">
-                    <input type="hidden" name="update_profile" value="1">
-                    
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Username</label>
-                        <input type="text" 
-                               value="<?= htmlspecialchars($profile['USERNAME']) ?>" 
-                               readonly 
-                               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 bg-gray-200">
+            
+            <?php if(!empty($pesan)): ?>
+                <div class="max-w-3xl mx-auto mb-6 <?= $hasil ? 'bg-green-100 border border-green-400 text-green-700' : 'bg-red-100 border border-red-400 text-red-700' ?> px-4 py-3 rounded-lg shadow-sm" role="alert">
+                    <div class="flex items-center">
+                        <i class="<?= $hasil ? 'fas fa-check-circle text-green-500' : 'fas fa-exclamation-circle text-red-500' ?> mr-2"></i>
+                        <span><?= htmlspecialchars($pesan) ?></span>
                     </div>
+                </div>
+            <?php endif; ?>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Nama Lengkap</label>
-                        <input type="text" 
-                               name="nama_lengkap" 
-                               value="<?= htmlspecialchars($profile['NAMA_LENGKAP']) ?>" 
-                               required 
-                               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <div class="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <!-- Informasi Akun -->
+                <div class="bg-white shadow-md rounded-lg p-6 border border-gray-200">
+                    <div class="flex items-center mb-6">
+                        <i class="fas fa-id-card text-green-500 text-xl mr-2"></i>
+                        <h2 class="text-2xl font-semibold text-gray-800">Informasi Akun</h2>
                     </div>
+                    <form method="POST">
+                        <input type="hidden" name="update_profile" value="1">
+                        
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">
+                                <i class="fas fa-user text-gray-500 mr-2"></i>Username
+                            </label>
+                            <input type="text" 
+                                   value="<?= htmlspecialchars($profile['USERNAME']) ?>" 
+                                   readonly 
+                                   class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 bg-gray-100">
+                        </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Email</label>
-                        <input type="email" 
-                               name="email" 
-                               value="<?= htmlspecialchars($profile['EMAIL']) ?>" 
-                               required 
-                               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">
+                                <i class="fas fa-address-card text-gray-500 mr-2"></i>Nama Lengkap
+                            </label>
+                            <input type="text" 
+                                   name="nama_lengkap" 
+                                   value="<?= htmlspecialchars($profile['NAMA_LENGKAP']) ?>" 
+                                   required 
+                                   class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">
+                                <i class="fas fa-envelope text-gray-500 mr-2"></i>Email
+                            </label>
+                            <input type="email" 
+                                   name="email" 
+                                   value="<?= htmlspecialchars($profile['EMAIL']) ?>" 
+                                   required 
+                                   class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">
+                                <i class="fas fa-phone text-gray-500 mr-2"></i>Nomor Telepon
+                            </label>
+                            <input type="tel" 
+                                   name="no_telepon" 
+                                   value="<?= htmlspecialchars($profile['NO_TELEPON']) ?>" 
+                                   required 
+                                   class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">
+                                <i class="fas fa-user-tag text-gray-500 mr-2"></i>Role
+                            </label>
+                            <div class="flex items-center bg-gray-100 border rounded-lg px-3 py-2">
+                                <span class="text-gray-700 capitalize"><?= htmlspecialchars($profile['ROLE']) ?></span>
+                                <?php if($profile['ROLE'] == 'admin'): ?>
+                                    <span class="ml-2 px-2 py-1 text-xs font-semibold bg-purple-100 text-purple-800 rounded-full">Admin</span>
+                                <?php else: ?>
+                                    <span class="ml-2 px-2 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded-full">Peminjam</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <div class="mb-6">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">
+                                <i class="fas fa-calendar-alt text-gray-500 mr-2"></i>Tanggal Registrasi
+                            </label>
+                            <div class="flex items-center bg-gray-100 border rounded-lg px-3 py-2">
+                                <span class="text-gray-700"><?= htmlspecialchars($profile['TANGGAL_REGISTRASI']) ?></span>
+                            </div>
+                        </div>
+
+                        <button type="submit" 
+                                class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition-all duration-200 flex items-center justify-center w-full">
+                            <i class="fas fa-save mr-2"></i> Perbarui Profil
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Ganti Password -->
+                <div class="bg-white shadow-md rounded-lg p-6 border border-gray-200">
+                    <div class="flex items-center mb-6">
+                        <i class="fas fa-key text-green-500 text-xl mr-2"></i>
+                        <h2 class="text-2xl font-semibold text-gray-800">Ganti Password</h2>
                     </div>
+                    <form method="POST">
+                        <input type="hidden" name="update_password" value="1">
+                        
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">
+                                <i class="fas fa-lock text-gray-500 mr-2"></i>Password Lama
+                            </label>
+                            <input type="password" 
+                                   name="current_password" 
+                                   required 
+                                   class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200">
+                        </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Nomor Telepon</label>
-                        <input type="tel" 
-                               name="no_telepon" 
-                               value="<?= htmlspecialchars($profile['NO_TELEPON']) ?>" 
-                               required 
-                               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">
+                                <i class="fas fa-lock text-gray-500 mr-2"></i>Password Baru
+                            </label>
+                            <input type="password" 
+                                   name="new_password" 
+                                   required 
+                                   class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200">
+                            <p class="text-sm text-gray-500 mt-1">
+                                <i class="fas fa-info-circle"></i> Password minimal 8 karakter
+                            </p>
+                        </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Role</label>
-                        <input type="text" 
-                               value="<?= htmlspecialchars($profile['ROLE']) ?>" 
-                               readonly 
-                               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 bg-gray-200">
-                    </div>
+                        <div class="mb-6">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">
+                                <i class="fas fa-lock text-gray-500 mr-2"></i>Konfirmasi Password Baru
+                            </label>
+                            <input type="password" 
+                                   name="confirm_password" 
+                                   required 
+                                   class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200">
+                        </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Tanggal Registrasi</label>
-                        <input type="text" 
-                               value="<?= htmlspecialchars($profile['TANGGAL_REGISTRASI']) ?>" 
-                               readonly 
-                               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 bg-gray-200">
-                    </div>
-
-                    <button type="submit" 
-                            class="bg-blue-700 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                        Perbarui Profil
-                    </button>
-                </form>
+                        <button type="submit" 
+                                class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition-all duration-200 flex items-center justify-center w-full">
+                            <i class="fas fa-key mr-2"></i> Ganti Password
+                        </button>
+                    </form>
+                </div>
             </div>
-
-            <div class="bg-white shadow-md rounded-lg p-6">
-                <h2 class="text-2xl font-semibold mb-4">Ganti Password</h2>
-                <form method="POST">
-                    <input type="hidden" name="update_password" value="1">
-                    
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Password Lama</label>
-                        <input type="password" 
-                               name="current_password" 
-                               required 
-                               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Password Baru</label>
-                        <input type="password" 
-                               name="new_password" 
-                               required 
-                               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Konfirmasi Password Baru</label>
-                        <input type="password" 
-                               name="confirm_password" 
-                               required 
-                               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-
-                    <button type="submit" 
-                            class="bg-blue-700 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                        Ganti Password
-                    </button>
-                </form>
+            
+            <div class="mt-8 text-center">
+                <a href="../user/index.php" class="inline-flex items-center text-green-600 hover:text-green-800 transition-colors duration-200">
+                    <i class="fas fa-arrow-left mr-2"></i> Kembali ke Dashboard
+                </a>
             </div>
         </div>
     </div>

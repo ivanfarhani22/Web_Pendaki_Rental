@@ -156,7 +156,7 @@ $riwayat = $riwayatPeminjaman->getRiwayatPeminjaman($_SESSION['user_id']);
 </head>
 <body class="bg-gradient-to-br from-gray-100 to-green-50 min-h-screen">
     <?php include '../includes/header.php'; ?>
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pt-32">
         <div class="container mx-auto">
             <div class="bg-white shadow-lg rounded-lg overflow-hidden border border-green-100">
                 <div class="bg-gradient-to-r from-green-900 to-green-900 p-6">
