@@ -216,6 +216,8 @@ $daftarPembayaran = $manajemenPembayaran->getDaftarPembayaran($status_filter);
     <title>Manajemen Pembayaran - Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+      <link rel="icon" href="/pendaki_gear/web/favicon.ico" type="image/x-icon">
+
 </head>
 <body class="bg-gray-50">
     <?php include 'components/sidebar.php'; ?>

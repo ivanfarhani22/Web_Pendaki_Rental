@@ -79,6 +79,8 @@ $totalCategories = $homePage->getCategories();
     <title>MountGear Rental - Sewa Alat Mendaki Terpercaya</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="icon" href="/pendaki_gear/web/favicon.ico" type="image/x-icon">
+
     <style>
         .hero-bg {
             background-image: url('https://st2.depositphotos.com/5991120/8867/v/450/depositphotos_88677448-stock-illustration-beautiful-green-mountains-summer-landscape.jpg');

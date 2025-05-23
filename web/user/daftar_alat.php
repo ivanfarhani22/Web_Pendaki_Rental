@@ -267,6 +267,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['pinjam_alat'])) {
     <title>Daftar Alat Pendakian</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+      <link rel="icon" href="/pendaki_gear/web/favicon.ico" type="image/x-icon">
+
 </head>
 <body class="bg-gradient-to-br from-green-50 via-teal-50 to-blue-100 min-h-screen">
     <?php include '../includes/header.php'; ?>
